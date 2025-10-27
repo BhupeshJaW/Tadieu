@@ -36,17 +36,23 @@ class TaskController extends Controller
             'due_date' => 'nullable|date|after:today',
         ]);
 
-        Task::create([
+        $task = Task::create([
             'description' => $request->description,
             'due_date' => $request->due_date,
         ]);
 
-        return redirect()->route('tasks.index');
+        return redirect('/')->with('new_task_id', $task->id);
     }
 
     public function update(Request $request, Task $task)
     {
-        $task->update(['done' => true]);
+        $validated = $request->validate([
+            'done' => 'sometimes|boolean',
+            'description' => 'sometimes|string|required',
+            'due_date' => 'sometimes|nullable|date|after:today',
+        ]);
+
+        $task->update($validated);
 
         return redirect()->route('tasks.index', ['status' => $request->query('status')]);
     }

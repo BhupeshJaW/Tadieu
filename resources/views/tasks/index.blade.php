@@ -41,11 +41,13 @@
 
         <ul class="grid gap-4">
             @foreach($tasks as $task)
-            <li class="flex items-center gap-4">
+            <li class="flex items-center gap-4" id="task-{{ $task->id }}"  {{ session('new_task_id') == $task->id ? 'animate-pulse bg-green-50' : '' }}">
                 <div class="flex flex-col gap-1 mr-auto">
-                    <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}">{{ $task->description }}</p>
+                    <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'description')" id="desc-{{ $task->id }}" style="cursor: pointer;">{{ $task->description }}</p>
                     @if($task->due_date)
-                        <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}">{{ $task->due_date->format('d-m-Y') }}</p>
+                        <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'due_date')" id="date-{{ $task->id }}" style="cursor: pointer;">{{ $task->due_date->format('d-m-Y') }}</p>
+                    @else
+                        <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'due_date')" id="date-{{ $task->id }}" style="cursor: pointer;">No due date</p>
                     @endif
                 </div>
 
@@ -53,6 +55,8 @@
                 <form class="form" method="POST" action="{{ route('tasks.update', $task) }}">
                     @csrf
                     @method('PATCH')
+                    <input type="hidden" name="status" value="{{ $status }}">
+                    <input type="hidden" name="done" value="1">
                     <button type="submit" class="btn-sm-outline">Done</button>
                 </form>
                 @endif
@@ -61,4 +65,73 @@
         </ul>
     </section>
 </div>
+
+<script>
+function editTask(taskId, field) {
+    const element = document.getElementById(field === 'description' ? `desc-${taskId}` : `date-${taskId}`);
+    const originalText = element.textContent;
+    const isDate = field === 'due_date';
+
+    let input;
+    if (isDate) {
+        input = document.createElement('input');
+        input.type = 'date';
+        input.value = originalText !== 'No due date' ? new Date(originalText.split('-').reverse().join('-')).toISOString().split('T')[0] : '';
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.value = originalText;
+    }
+
+    input.className = 'text-sm';
+    input.style.width = '100%';
+
+    element.replaceWith(input);
+    input.focus();
+
+    function saveEdit() {
+        const newValue = input.value;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/tasks/${taskId}`;
+        form.style.display = 'none';
+
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = '_token';
+        csrf.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content') || '{{ csrf_token() }}';
+        form.appendChild(csrf);
+
+        const method = document.createElement('input');
+        method.type = 'hidden';
+        method.name = '_method';
+        method.value = 'PATCH';
+        form.appendChild(method);
+
+        const statusInput = document.createElement('input');
+        statusInput.type = 'hidden';
+        statusInput.name = 'status';
+        statusInput.value = '{{ $status }}';
+        form.appendChild(statusInput);
+
+        const fieldInput = document.createElement('input');
+        fieldInput.type = 'hidden';
+        fieldInput.name = field;
+        fieldInput.value = newValue;
+        form.appendChild(fieldInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    input.addEventListener('blur', saveEdit);
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            saveEdit();
+        } else if (e.key === 'Escape') {
+            input.replaceWith(element);
+        }
+    });
+}
+</script>
 @endsection
