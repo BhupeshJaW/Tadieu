@@ -17,20 +17,23 @@
     <section>
         <form class="form grid gap-6" method="POST" action="{{ route('tasks.store') }}">
             @csrf
+            {{-- Task Description Input --}}
             <div class="grid gap-2">
                 <label for="task_description">Description</label>
                 <div class="grid grid-cols-[1fr_180px] gap-2">
                     <input type="text" id="task_description" name="description" placeholder="describe the task..." tabindex="1" autofocus value="{{ old('description') }}">
                     <button type="submit" class="btn" tabindex="3">Add</button>
                 </div>
+                {{-- Display validation error for description --}}
                 @error('description')
                     <p class="text-red-500 text-sm">{{ $message }}</p>
                 @enderror
             </div>
-
+            {{-- Task Due Date Input --}}
             <div class="grid gap-2">
                 <label for="task_due_date">Due date</label>
                 <input type="date" id="task_due_date" name="due_date" tabindex="2" value="{{ old('due_date') }}">
+                {{-- Display validation error for due_date --}}
                 @error('due_date')
                     <p class="text-red-500 text-sm">{{ $message }}</p>
                 @enderror
@@ -41,6 +44,7 @@
     <hr>
 
     <section>
+        {{-- Task Filter Form --}}
         <form class="form flex gap-2 mb-6" method="GET" action="{{ route('tasks.index') }}">
             <label for="filter_status">Filter tasks</label>
             <select id="filter_status" name="status">
@@ -50,35 +54,27 @@
             </select>
             <button type="submit" class="btn">Filter</button>
         </form>
-
+        {{-- Task List --}}
         <ul class="grid gap-4">
             @foreach($tasks as $task)
-                {{-- conditional highlight animation for newly added task --}}
+                {{-- Highlight new task --}}
                 <li id="task-{{ $task->id }}" class="flex items-center gap-4 {{ session('new_task_id') == $task->id ? 'fade-highlight' : '' }}">
-                    <div class="flex flex-col gap-1 mr-auto">
-                        <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}" 
-                           onclick="editTask({{ $task->id }}, 'description')" 
-                           id="desc-{{ $task->id }}" 
-                           style="cursor: pointer;">
-                           {{ $task->description }}
+                    <div class="flex flex-col gap-1 mr-auto" onclick="editTask({{ $task->id }})" style="cursor: pointer;">
+                        <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}" id="desc-{{ $task->id }}">
+                            {{ $task->description }}
                         </p>
+                        {{-- Show due date or "No due date" fallback --}}
                         @if($task->due_date)
-                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" 
-                               onclick="editTask({{ $task->id }}, 'due_date')" 
-                               id="date-{{ $task->id }}" 
-                               style="cursor: pointer;">
-                               {{ $task->due_date->format('d-m-Y') }}
+                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" id="date-{{ $task->id }}">
+                                {{ $task->due_date->format('d-m-Y') }}
                             </p>
                         @else
-                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" 
-                               onclick="editTask({{ $task->id }}, 'due_date')" 
-                               id="date-{{ $task->id }}" 
-                               style="cursor: pointer;">
-                               No due date
+                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" id="date-{{ $task->id }}">
+                                No due date
                             </p>
                         @endif
                     </div>
-
+                    {{-- Mark as Done Button (only if not done) --}}
                     @if(!$task->done)
                     <form class="form" method="POST" action="{{ route('tasks.update', $task) }}">
                         @csrf
@@ -93,73 +89,69 @@
         </ul>
     </section>
 </div>
-
 <script>
-function editTask(taskId, field) {
-    const element = document.getElementById(field === 'description' ? `desc-${taskId}` : `date-${taskId}`);
-    const originalText = element.textContent;
-    const isDate = field === 'due_date';
+/**
+ * ✏️ editTask()
+ * Converts a static task view into an inline editable form (description + due_date).
+ * Keeps UX smooth by replacing only the clicked task with a form.
+ */
+function editTask(taskId) {
+    const descEl = document.getElementById(`desc-${taskId}`);
+    const dateEl = document.getElementById(`date-${taskId}`);
 
-    let input;
-    if (isDate) {
-        input = document.createElement('input');
-        input.type = 'date';
-        input.value = originalText !== 'No due date' ? new Date(originalText.split('-').reverse().join('-')).toISOString().split('T')[0] : '';
-    } else {
-        input = document.createElement('input');
-        input.type = 'text';
-        input.value = originalText;
-    }
+    if (!descEl || !dateEl) return; // prevent null errors
 
-    input.className = 'text-sm';
-    input.style.width = '100%';
+    const descText = descEl.textContent.trim();
+    const dateText = dateEl.textContent.trim();
 
-    element.replaceWith(input);
-    input.focus();
+    // Create editable form dynamically
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/tasks/${taskId}`;
+    form.className = 'flex flex-col gap-2 w-full';
 
-    function saveEdit() {
-        const newValue = input.value;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/tasks/${taskId}`;
-        form.style.display = 'none';
+    // Add CSRF + PATCH
+    form.innerHTML = `
+        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="_method" value="PATCH">
+        <input type="hidden" name="status" value="{{ $status }}">
 
-        const csrf = document.createElement('input');
-        csrf.type = 'hidden';
-        csrf.name = '_token';
-        csrf.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content') || '{{ csrf_token() }}';
-        form.appendChild(csrf);
+        <input type="text" name="description" value="${descText}" class="border p-1 rounded text-sm w-full" required>
+        <!-- Convert 'd-m-Y' to 'Y-m-d' for input[type=date] compatibility -->
+        <input type="date" name="due_date" value="${dateText !== 'No due date' ? new Date(dateText.split('-').reverse().join('-')).toISOString().split('T')[0] : ''}" class="border p-1 rounded text-sm w-full">
+        <div class="flex gap-2 mt-1 items-center">
+            <button type="submit" class="btn-sm">Save</button>
+            <button type="button" class="text-red-500 text-sm" title="Close edit" onclick="closeEdit(event, ${taskId}, '${descText}', '${dateText}')">✖</button>
+        </div>
+    `; 
+    // Replace the static display wrapper with the new editable form
+    const wrapper = descEl.parentElement;
+    wrapper.replaceWith(form); 
+    // Automatically focus description for quicker editing
+    form.querySelector('input[name="description"]').focus();
+}
 
-        const method = document.createElement('input');
-        method.type = 'hidden';
-        method.name = '_method';
-        method.value = 'PATCH';
-        form.appendChild(method);
+/**
+ * ❌ closeEdit()
+ * Reverts the editable form back to its original display (description + date)
+ * without submitting any changes.
+ */
+function closeEdit(e, taskId, descText, dateText) {
+    e.stopPropagation(); // stop click from triggering parent editTask()
 
-        const statusInput = document.createElement('input');
-        statusInput.type = 'hidden';
-        statusInput.name = 'status';
-        statusInput.value = '{{ $status }}';
-        form.appendChild(statusInput);
-
-        const fieldInput = document.createElement('input');
-        fieldInput.type = 'hidden';
-        fieldInput.name = field;
-        fieldInput.value = newValue;
-        form.appendChild(fieldInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-
-    input.addEventListener('blur', saveEdit);
-    input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            saveEdit();
-        } else if (e.key === 'Escape') {
-            input.replaceWith(element);
-        }
-    });
+    const form = e.target.closest('form');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col gap-1 mr-auto';
+    wrapper.setAttribute('onclick', `editTask(${taskId})`);
+    wrapper.style.cursor = 'pointer';
+    // Restore original text view
+    wrapper.innerHTML = `
+        <p class="text-sm font-medium leading-none" id="desc-${taskId}">${descText}</p>
+        <p class="text-sm font-muted leading-none" id="date-${taskId}">${dateText}</p>
+    `;
+    // Replace form with static display
+    form.replaceWith(wrapper);
 }
 </script>
+
 @endsection
