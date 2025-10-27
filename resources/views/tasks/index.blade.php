@@ -1,6 +1,18 @@
 @extends('layout')
 
 @section('content')
+<style>
+/* Fade-out animation for new task highlight */
+.fade-highlight {
+    animation: fadeOut 3s ease-out forwards;
+    background-color: #dcfce7; /* Tailwind's bg-green-50 */
+}
+@keyframes fadeOut {
+    0% { background-color: #dcfce7; }
+    100% { background-color: transparent; }
+}
+</style>
+
 <div class="card w-full">
     <section>
         <form class="form grid gap-6" method="POST" action="{{ route('tasks.store') }}">
@@ -41,26 +53,42 @@
 
         <ul class="grid gap-4">
             @foreach($tasks as $task)
-            <li class="flex items-center gap-4" id="task-{{ $task->id }}"  {{ session('new_task_id') == $task->id ? 'animate-pulse bg-green-50' : '' }}">
-                <div class="flex flex-col gap-1 mr-auto">
-                    <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'description')" id="desc-{{ $task->id }}" style="cursor: pointer;">{{ $task->description }}</p>
-                    @if($task->due_date)
-                        <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'due_date')" id="date-{{ $task->id }}" style="cursor: pointer;">{{ $task->due_date->format('d-m-Y') }}</p>
-                    @else
-                        <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" onclick="editTask({{ $task->id }}, 'due_date')" id="date-{{ $task->id }}" style="cursor: pointer;">No due date</p>
-                    @endif
-                </div>
+                {{-- conditional highlight animation for newly added task --}}
+                <li id="task-{{ $task->id }}" class="flex items-center gap-4 {{ session('new_task_id') == $task->id ? 'fade-highlight' : '' }}">
+                    <div class="flex flex-col gap-1 mr-auto">
+                        <p class="text-sm font-medium leading-none {{ $task->done ? 'line-through' : '' }}" 
+                           onclick="editTask({{ $task->id }}, 'description')" 
+                           id="desc-{{ $task->id }}" 
+                           style="cursor: pointer;">
+                           {{ $task->description }}
+                        </p>
+                        @if($task->due_date)
+                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" 
+                               onclick="editTask({{ $task->id }}, 'due_date')" 
+                               id="date-{{ $task->id }}" 
+                               style="cursor: pointer;">
+                               {{ $task->due_date->format('d-m-Y') }}
+                            </p>
+                        @else
+                            <p class="text-sm font-muted leading-none {{ $task->done ? 'line-through' : '' }}" 
+                               onclick="editTask({{ $task->id }}, 'due_date')" 
+                               id="date-{{ $task->id }}" 
+                               style="cursor: pointer;">
+                               No due date
+                            </p>
+                        @endif
+                    </div>
 
-                @if(!$task->done)
-                <form class="form" method="POST" action="{{ route('tasks.update', $task) }}">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="status" value="{{ $status }}">
-                    <input type="hidden" name="done" value="1">
-                    <button type="submit" class="btn-sm-outline">Done</button>
-                </form>
-                @endif
-            </li>
+                    @if(!$task->done)
+                    <form class="form" method="POST" action="{{ route('tasks.update', $task) }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="status" value="{{ $status }}">
+                        <input type="hidden" name="done" value="1">
+                        <button type="submit" class="btn-sm-outline">Done</button>
+                    </form>
+                    @endif
+                </li>
             @endforeach
         </ul>
     </section>
